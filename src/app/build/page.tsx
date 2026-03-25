@@ -106,8 +106,11 @@ function BuildPageContent() {
 
           <PartsTable
             parts={state.build.parts}
+            removedParts={state.removedParts}
             getAlternatives={getAlternativesForCategory}
             onSwap={(category, part) => dispatch({ type: "SWAP_PART", category, part })}
+            onRemove={(category) => dispatch({ type: "REMOVE_PART", category })}
+            onRestore={(category) => dispatch({ type: "RESTORE_PART", category })}
           />
 
           <div className="flex gap-3 pt-4">

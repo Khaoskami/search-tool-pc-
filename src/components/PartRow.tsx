@@ -7,6 +7,7 @@ import RetailerLinks from "./RetailerLinks";
 interface PartRowProps {
   part: Part;
   onSwapClick: (category: PartCategory) => void;
+  onRemoveClick: (category: PartCategory) => void;
 }
 
 const categoryIcons: Record<PartCategory, string> = {
@@ -24,7 +25,7 @@ const categoryIcons: Record<PartCategory, string> = {
   headset: "🎧",
 };
 
-export default function PartRow({ part, onSwapClick }: PartRowProps) {
+export default function PartRow({ part, onSwapClick, onRemoveClick }: PartRowProps) {
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition-colors">
       <div className="flex flex-col sm:flex-row sm:items-start gap-4">
@@ -49,6 +50,15 @@ export default function PartRow({ part, onSwapClick }: PartRowProps) {
             className="px-3 py-1.5 text-xs font-medium text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/10 transition-colors"
           >
             Swap
+          </button>
+          <button
+            onClick={() => onRemoveClick(part.category)}
+            className="px-2 py-1.5 text-xs font-medium text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/10 transition-colors"
+            title="Remove from build"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
       </div>
