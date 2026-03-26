@@ -11,6 +11,7 @@ interface BuildState {
   preferences: BuildPreferences;
   build: Build | null;
   swappedParts: Record<string, string>; // category -> partId overrides
+  removedParts: Part[]; // parts removed from the build
 }
 
 type BuildAction =
@@ -21,6 +22,8 @@ type BuildAction =
   | { type: "SET_CASE_SIZE"; caseSize: CaseSize }
   | { type: "GENERATE_BUILD" }
   | { type: "SWAP_PART"; category: PartCategory; part: Part }
+  | { type: "REMOVE_PART"; category: PartCategory }
+  | { type: "RESTORE_PART"; category: PartCategory }
   | { type: "GO_TO_STEP"; step: Step }
   | { type: "RESET" };
 
@@ -46,7 +49,7 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
       return { ...state, preferences: { ...state.preferences, caseSize: action.caseSize } };
     case "GENERATE_BUILD": {
       const build = generateBuild(state.preferences);
-      return { ...state, build, step: 2, swappedParts: {} };
+      return { ...state, build, step: 2, swappedParts: {}, removedParts: [] };
     }
     case "SWAP_PART": {
       if (!state.build) return state;
@@ -60,10 +63,34 @@ function buildReducer(state: BuildState, action: BuildAction): BuildState {
         swappedParts: { ...state.swappedParts, [action.category]: action.part.id },
       };
     }
+    case "REMOVE_PART": {
+      if (!state.build) return state;
+      const partToRemove = state.build.parts.find((p) => p.category === action.category);
+      if (!partToRemove) return state;
+      const remainingParts = state.build.parts.filter((p) => p.category !== action.category);
+      const totalEstimatedZAR = remainingParts.reduce((sum, p) => sum + p.estimatedPriceZAR, 0);
+      return {
+        ...state,
+        build: { ...state.build, parts: remainingParts, totalEstimatedZAR },
+        removedParts: [...state.removedParts, partToRemove],
+      };
+    }
+    case "RESTORE_PART": {
+      if (!state.build) return state;
+      const partToRestore = state.removedParts.find((p) => p.category === action.category);
+      if (!partToRestore) return state;
+      const restoredParts = [...state.build.parts, partToRestore];
+      const totalEstimatedZAR = restoredParts.reduce((sum, p) => sum + p.estimatedPriceZAR, 0);
+      return {
+        ...state,
+        build: { ...state.build, parts: restoredParts, totalEstimatedZAR },
+        removedParts: state.removedParts.filter((p) => p.category !== action.category),
+      };
+    }
     case "GO_TO_STEP":
       return { ...state, step: action.step };
     case "RESET":
-      return { step: 1, preferences: defaultPreferences, build: null, swappedParts: {} };
+      return { step: 1, preferences: defaultPreferences, build: null, swappedParts: {}, removedParts: [] };
     default:
       return state;
   }
@@ -75,6 +102,7 @@ export function useBuild(initialTier?: BudgetTier) {
     preferences: { ...defaultPreferences, tier: initialTier || defaultPreferences.tier },
     build: null,
     swappedParts: {},
+    removedParts: [],
   });
 
   // Try to restore from localStorage
