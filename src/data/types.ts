@@ -115,6 +115,32 @@ export const TIER_INFO: TierInfo[] = [
   },
 ];
 
+// Scraped price data
+export interface ScrapedPrice {
+  retailerId: string;
+  retailerName: string;
+  productName: string;
+  priceZAR: number;
+  productUrl: string;
+  inStock: boolean;
+}
+
+export interface PriceResult {
+  partId: string;
+  searchQuery: string;
+  prices: ScrapedPrice[];
+  status: "loaded" | "loading" | "error";
+}
+
+export type PriceMap = Record<string, PriceResult>; // keyed by partId
+
+// Compatibility
+export interface CompatibilityIssue {
+  severity: "error" | "warning" | "info";
+  message: string;
+  parts: string[]; // part IDs involved
+}
+
 export const CATEGORY_LABELS: Record<PartCategory, string> = {
   cpu: "Processor (CPU)",
   gpu: "Graphics Card (GPU)",

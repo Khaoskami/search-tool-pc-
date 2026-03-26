@@ -4,21 +4,32 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { BudgetTier } from "@/data/types";
 import { useBuild } from "@/hooks/useBuild";
+import { usePrices } from "@/hooks/usePrices";
+import { checkCompatibility } from "@/lib/compatibility";
 import BudgetSelector from "@/components/BudgetSelector";
 import PreferenceForm from "@/components/PreferenceForm";
 import PartsTable from "@/components/PartsTable";
 import PriceSummary from "@/components/PriceSummary";
 import BuyInOnePlace from "@/components/BuyInOnePlace";
+import CompatibilityChecker from "@/components/CompatibilityChecker";
 
 function BuildPageContent() {
   const searchParams = useSearchParams();
   const initialTier = (searchParams.get("tier") as BudgetTier) || undefined;
   const { state, dispatch, getAlternativesForCategory } = useBuild(initialTier);
 
+  const buildParts = state.build?.parts || [];
+  const { prices, isLoading: isLoadingPrices, storeTotals } = usePrices(buildParts);
+
+  // Compatibility check
+  const compatibilityIssues = state.build
+    ? checkCompatibility(state.build.parts, state.preferences.caseSize)
+    : [];
+
   const steps = [
-    { num: 1, label: "Configure" },
-    { num: 2, label: "Review Parts" },
-    { num: 3, label: "Buy" },
+    { num: 1, label: "Configure", icon: "⚙️" },
+    { num: 2, label: "Review Parts", icon: "🔧" },
+    { num: 3, label: "Buy", icon: "🛒" },
   ];
 
   return (
@@ -33,21 +44,19 @@ function BuildPageContent() {
                 if (s.num === 2 && state.build) dispatch({ type: "GO_TO_STEP", step: 2 });
                 if (s.num === 3 && state.build) dispatch({ type: "GO_TO_STEP", step: 3 });
               }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
                 state.step === s.num
-                  ? "bg-blue-600 text-white"
+                  ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/20"
                   : state.step > s.num
-                  ? "bg-blue-600/20 text-blue-400 cursor-pointer"
+                  ? "bg-blue-600/20 text-blue-400 cursor-pointer hover:bg-blue-600/30"
                   : "bg-zinc-800 text-zinc-500"
               }`}
             >
-              <span className="w-5 h-5 rounded-full bg-current/20 flex items-center justify-center text-xs">
-                {state.step > s.num ? "✓" : s.num}
-              </span>
+              <span className="text-xs">{state.step > s.num ? "✓" : s.icon}</span>
               <span className="hidden sm:inline">{s.label}</span>
             </button>
             {i < steps.length - 1 && (
-              <div className={`w-8 h-0.5 ${state.step > s.num ? "bg-blue-500" : "bg-zinc-700"}`} />
+              <div className={`w-8 h-0.5 rounded-full transition-colors ${state.step > s.num ? "bg-blue-500" : "bg-zinc-700"}`} />
             )}
           </div>
         ))}
@@ -87,7 +96,17 @@ function BuildPageContent() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-white">Your Build</h2>
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                Your Build
+                {isLoadingPrices && (
+                  <span className="inline-flex items-center gap-1.5 text-sm font-normal text-blue-400">
+                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4" strokeLinecap="round" opacity="0.4" />
+                    </svg>
+                    Fetching prices...
+                  </span>
+                )}
+              </h2>
               <p className="text-sm text-zinc-400">
                 {state.preferences.tier.charAt(0).toUpperCase() + state.preferences.tier.slice(1)} tier
                 &bull; {state.preferences.cpuBrand.toUpperCase()} CPU
@@ -102,11 +121,20 @@ function BuildPageContent() {
             </button>
           </div>
 
-          <PriceSummary total={state.build.totalEstimatedZAR} partCount={state.build.parts.length} />
+          {/* Compatibility Checker */}
+          <CompatibilityChecker issues={compatibilityIssues} />
+
+          <PriceSummary
+            total={state.build.totalEstimatedZAR}
+            partCount={state.build.parts.length}
+            isLoadingPrices={isLoadingPrices}
+            cheapestStore={storeTotals?.[0]}
+          />
 
           <PartsTable
             parts={state.build.parts}
             removedParts={state.removedParts}
+            prices={prices}
             getAlternatives={getAlternativesForCategory}
             onSwap={(category, part) => dispatch({ type: "SWAP_PART", category, part })}
             onRemove={(category) => dispatch({ type: "REMOVE_PART", category })}
@@ -122,7 +150,7 @@ function BuildPageContent() {
             </button>
             <button
               onClick={() => dispatch({ type: "GO_TO_STEP", step: 3 })}
-              className="flex-1 py-3 px-6 rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-500 transition-colors"
+              className="flex-1 py-3 px-6 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 transition-all shadow-lg shadow-blue-500/20"
             >
               Ready to Buy
             </button>
@@ -148,9 +176,18 @@ function BuildPageContent() {
             </button>
           </div>
 
-          <PriceSummary total={state.build.totalEstimatedZAR} partCount={state.build.parts.length} />
+          <PriceSummary
+            total={state.build.totalEstimatedZAR}
+            partCount={state.build.parts.length}
+            isLoadingPrices={isLoadingPrices}
+            cheapestStore={storeTotals?.[0]}
+          />
 
-          <BuyInOnePlace parts={state.build.parts} />
+          <BuyInOnePlace
+            parts={state.build.parts}
+            storeTotals={storeTotals}
+            isLoadingPrices={isLoadingPrices}
+          />
 
           <div className="flex gap-3 pt-4">
             <button
@@ -175,8 +212,13 @@ function BuildPageContent() {
 export default function BuildPage() {
   return (
     <Suspense fallback={
-      <div className="max-w-5xl mx-auto px-4 py-8 text-center text-zinc-400">
-        Loading builder...
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-center gap-3 text-zinc-400">
+          <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4" strokeLinecap="round" opacity="0.4" />
+          </svg>
+          Loading builder...
+        </div>
       </div>
     }>
       <BuildPageContent />
